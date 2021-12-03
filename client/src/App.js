@@ -5,6 +5,9 @@ import { useState } from "react";
 import { SlimNoteList } from "./SlimNotesList";
 import { SelectCategory } from "./SelectCategory";
 
+import { Route } from "react-router";
+import { EditNote } from "./EditNote";
+
 function App() {
   const [slimListOpen, setSlimListOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("1");
@@ -16,13 +19,16 @@ function App() {
           onCategoryChange={(category) => setSelectedCategory(category)}
         ></SelectCategory>
         <NoteList category={selectedCategory} />
-      </Stack>
-      <Box width="350px">
+        <Box width="350px">
         <Button onClick={() => setSlimListOpen(!slimListOpen)}>
           Open List
         </Button>
         {slimListOpen && <SlimNoteList />}
       </Box>
+      </Stack>
+      <Route path={`/note/:noteId`}>
+        <EditNote />
+      </Route>
     </UiAppLayout>
   );
 }
