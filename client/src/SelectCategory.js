@@ -1,11 +1,10 @@
 import { Box, Select } from "@chakra-ui/react";
+import { useQuery } from "@apollo/client";
+import { ALL_CATEGORIES_QUERY } from "./EditCategories";
 
 function SelectCategory({ onCategoryChange, defaultValue }) {
-  const categories = [
-    { id: "1", label: "✈️ Holiday Planning" },
-    { id: "2", label: "🛒 Shopping" },
-    { id: "3", label: "📝 Saved articles" },
-  ];
+  const { data } = useQuery(ALL_CATEGORIES_QUERY);
+
   return (
     <Box>
       <Select
@@ -13,7 +12,7 @@ function SelectCategory({ onCategoryChange, defaultValue }) {
         defaultValue={defaultValue}
         onChange={(e) => onCategoryChange(e.target.value)}
       >
-        {categories.map((category) => (
+        {data?.categories?.map((category) => (
           <option key={category.id} value={category.id}>
             {category.label}
           </option>

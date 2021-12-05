@@ -1,6 +1,6 @@
 import { Stack, Spinner, Heading } from "@chakra-ui/react";
-import { UiNote, ViewNoteButton } from "./shared-ui";
-import { gql, useQuery } from "@apollo/client";
+import { UiNote, ViewNoteButton, DeleteButton } from "./shared-ui";
+import { gql, useMutation, useQuery } from "@apollo/client";
 import { Link } from "react-router-dom";
 
 const ALL_NODES_QUERY = gql`
@@ -9,6 +9,7 @@ const ALL_NODES_QUERY = gql`
       id
       content
       category {
+        id
         label
       }
     }
@@ -24,13 +25,49 @@ export function NoteList({ category }) {
     // when to delete cache, when to fetch new data
     // "cache-and-network" will display cache first
     // and fetching new data from netowrk to update cache
-    fetchPolicy: "cache-and-network",
+    // [Notice] using "cache-and-network" is somehow expensive
+    // for example, after a delete mutation call, even you use `update(cache, mutationResult)`
+    // it will still make an extra fetch call to the backend
+    //
+    fetchPolicy: "cache-first",
     // by default when there is backend error
     // apollo will set data to undefined
     // if we don't want this behavior
     // we can set errorPolicy to "all"
     errorPolicy: "all",
   });
+
+  const [deleteNote] = useMutation(
+    gql`
+      mutation DeleteNote($noteId: String!) {
+        deleteNote(id: $noteId) {
+          successful
+          note {
+            id
+          }
+        }
+      }
+    `,
+    {
+      // refetch the note list after delete
+      // refetchQueries: ["GetAllNotes"],
+      // or we can directly modify cache to avoid make an extra fetch call
+      update: (cache, mutationResult) => {
+        const deletedNoteId = cache.identify(
+          mutationResult.data.deleteNote.note
+        );
+        cache.modify({
+          fields: {
+            notes: (existingNotes) => {
+              return existingNotes.filter((noteRef) => {
+                return cache.identify(noteRef) !== deletedNoteId;
+              });
+            },
+          },
+        });
+      },
+    }
+  );
 
   if (loading && !data) {
     return <Spinner />;
@@ -52,6 +89,15 @@ export function NoteList({ category }) {
           <Link to={`/note/${note.id}`}>
             <ViewNoteButton />
           </Link>
+          <DeleteButton
+            onClick={() =>
+              deleteNote({
+                variables: {
+                  noteId: note.id,
+                },
+              })
+            }
+          />
         </UiNote>
       ))}
     </Stack>
