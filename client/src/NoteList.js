@@ -1,13 +1,26 @@
-import { Stack, Spinner, Heading } from "@chakra-ui/react";
-import { UiNote, ViewNoteButton, DeleteButton } from "./shared-ui";
+import { Stack, Spinner, Heading, Checkbox } from "@chakra-ui/react";
+import {
+  UiNote,
+  ViewNoteButton,
+  DeleteButton,
+  UiLoadMoreButton,
+} from "./shared-ui";
 import { gql, useMutation, useQuery } from "@apollo/client";
 import { Link } from "react-router-dom";
+import { setNoteSelection } from ".";
 
+// isSelected is client only state
+// which doesn't need to be sent to the server
+// interesting usage for @clinet
+// you can mark all the fields as @client
+// so that the state only stay in client, not being sent to backend
+// so that you can slowly migrate backend to support it
 const ALL_NODES_QUERY = gql`
-  query GetAllNotes($categoryId: String) {
-    notes(categoryId: $categoryId) {
+  query GetAllNotes($categoryId: String, $offset: Int, $limit: Int) {
+    notes(categoryId: $categoryId, offset: $offset, limit: $limit) {
       id
       content
+      isSelected @client
       category {
         id
         label
@@ -17,9 +30,11 @@ const ALL_NODES_QUERY = gql`
 `;
 
 export function NoteList({ category }) {
-  const { data, loading, error } = useQuery(ALL_NODES_QUERY, {
+  const { data, loading, error, fetchMore } = useQuery(ALL_NODES_QUERY, {
     variables: {
       categoryId: category,
+      offset: 0,
+      limit: 3,
     },
     // setup fetch policy to handle the cache
     // when to delete cache, when to fetch new data
@@ -36,7 +51,6 @@ export function NoteList({ category }) {
     // we can set errorPolicy to "all"
     errorPolicy: "all",
   });
-
   const [deleteNote] = useMutation(
     gql`
       mutation DeleteNote($noteId: String!) {
@@ -48,7 +62,21 @@ export function NoteList({ category }) {
         }
       }
     `,
+    // optimistic detel
+    // if delete failed then apollo will restore item from cache
     {
+      optimisticResponse: (vars) => {
+        return {
+          deleteNote: {
+            successful: true,
+            __typename: "DeleteNoteResponse",
+            note: {
+              id: vars.noteId,
+              __typename: "Note",
+            },
+          },
+        };
+      },
       // refetch the note list after delete
       // refetchQueries: ["GetAllNotes"],
       // or we can directly modify cache to avoid make an extra fetch call
@@ -65,6 +93,10 @@ export function NoteList({ category }) {
             },
           },
         });
+        // if item was sucessfully deleted
+        // we also want to remove the cache from master cache
+        // it benefits other components update the state correctly
+        cache.evict({ id: deletedNoteId });
       },
     }
   );
@@ -86,6 +118,12 @@ export function NoteList({ category }) {
           content={note.content}
           category={note.category.label}
         >
+          <Checkbox
+            onChange={(e) => setNoteSelection(note.id, e.target.value)}
+            isChecked={note.isSelected}
+          >
+            Select
+          </Checkbox>
           <Link to={`/note/${note.id}`}>
             <ViewNoteButton />
           </Link>
@@ -100,6 +138,9 @@ export function NoteList({ category }) {
           />
         </UiNote>
       ))}
+      <UiLoadMoreButton
+        onClick={() => fetchMore({ variables: { offset: data.notes.length } })}
+      />
     </Stack>
   );
 }
