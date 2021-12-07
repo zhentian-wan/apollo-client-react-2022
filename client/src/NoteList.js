@@ -29,6 +29,24 @@ const ALL_NODES_QUERY = gql`
   }
 `;
 
+const ALL_NODES_QUERY_REST = gql`
+  query GetAllNotes($categoryId: String, $offset: Int, $limit: Int) {
+    notes(categoryId: $categoryId, offset: $offset, limit: $limit)
+      @rest(
+        type: "Note"
+        path: "/notes?categoryId={args.categoryId}&offset={args.offset}&limit={args.limit}"
+      ) {
+      id
+      content
+      isSelected @client
+      category {
+        id
+        label
+      }
+    }
+  }
+`;
+
 export function NoteList({ category }) {
   const { data, loading, error, fetchMore } = useQuery(ALL_NODES_QUERY, {
     variables: {
@@ -51,6 +69,23 @@ export function NoteList({ category }) {
     // we can set errorPolicy to "all"
     errorPolicy: "all",
   });
+  /**
+   * `
+      mutation DeleteNote($noteId: String!)
+      @rest(
+        type: "DeleteNoteResponse"
+        method: "DELETE"
+        path: "/notes?categoryId={args.categoryId}&offset={args.offset}&limit={args.limit}"
+      ) {
+        deleteNote(id: $noteId) {
+          successful
+          note @type(name: "Note"){
+            id
+          }
+        }
+      }
+    `
+   */
   const [deleteNote] = useMutation(
     gql`
       mutation DeleteNote($noteId: String!) {

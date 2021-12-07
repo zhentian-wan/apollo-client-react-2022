@@ -12,6 +12,7 @@ import {
   makeVar,
 } from "@apollo/client";
 import { RetryLink } from "@apollo/client/link/retry";
+import { RestLink } from "apollo-link-rest";
 
 // makeVar let apollo know the variable value changes
 let selectedNoteIds = makeVar(["2"]);
@@ -25,6 +26,9 @@ export function setNoteSelection(noteId, isSelected) {
   }
 }
 
+const restLink = new RestLink({
+  uri: "http://localhost:4000/rests-api",
+});
 const httpLink = new HttpLink({
   uri: "http://localhost:4000/graphql",
 });
@@ -50,6 +54,19 @@ const client = new ApolloClient({
               return [...existingNotes, ...incomingNotes];
             },
           },
+          // cache redirect policy
+          // since when we load NoteList, all the View Note data is already in cache
+          // if we don't want Apollo try to fetch data again, we can directly get data
+          // from the cache
+          note: {
+            read: (crtValue, helpers) => {
+              const queriedNoteId = helpers.args.id;
+              return helpers.toReference({
+                __typename: "Note",
+                id: queriedNoteId,
+              });
+            },
+          },
         },
       },
       // define a new type called Note
@@ -66,7 +83,7 @@ const client = new ApolloClient({
     },
   }),
   // from method combine multi links into single link
-  link: from([retryLink, httpLink]),
+  link: from([retryLink, restLink, httpLink]),
 });
 
 ReactDOM.render(

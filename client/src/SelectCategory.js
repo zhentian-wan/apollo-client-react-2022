@@ -3,7 +3,9 @@ import { useQuery } from "@apollo/client";
 import { ALL_CATEGORIES_QUERY } from "./EditCategories";
 
 function SelectCategory({ onCategoryChange, defaultValue }) {
-  const { data } = useQuery(ALL_CATEGORIES_QUERY);
+  const { data } = useQuery(ALL_CATEGORIES_QUERY, {
+    pollInterval: 10 * 60 * 1000, // get new data every 10 mins
+  });
 
   return (
     <Box>
