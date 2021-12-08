@@ -1,11 +1,11 @@
-import { Stack, Spinner, Heading, Checkbox } from "@chakra-ui/react";
+import { Stack, Spinner, Heading, Checkbox, Text } from "@chakra-ui/react";
 import {
   UiNote,
   ViewNoteButton,
   DeleteButton,
   UiLoadMoreButton,
 } from "./shared-ui";
-import { gql, useMutation, useQuery } from "@apollo/client";
+import { gql, useMutation, useQuery, useSubscription } from "@apollo/client";
 import { Link } from "react-router-dom";
 import { setNoteSelection } from ".";
 
@@ -136,6 +136,28 @@ export function NoteList({ category }) {
     }
   );
 
+  const { data: newNoteData } = useSubscription(
+    gql`
+      subscription NewSharedNote($categoryId: String) {
+        newSharedNote(categoryId: $categoryId) {
+          id
+          content
+          category {
+            id
+            label
+          }
+        }
+      }
+    `,
+    {
+      variables: {
+        categoryId: category,
+      },
+    }
+  );
+
+  const newNote = newNoteData?.newSharedNote;
+
   if (loading && !data) {
     return <Spinner />;
   }
@@ -144,9 +166,20 @@ export function NoteList({ category }) {
     return <Heading>Cannot fetch notes</Heading>;
   }
 
+  const recentChanges = newNote && (
+    <>
+      <Text>Recent changes: </Text>
+      <UiNote
+        category={newNote.category.label}
+        content={newNote.content}
+      ></UiNote>
+    </>
+  );
+
   const notes = data?.notes?.filter(Boolean);
   return (
     <Stack spacing={4}>
+      {recentChanges}
       {notes?.map((note) => (
         <UiNote
           key={note.id}
