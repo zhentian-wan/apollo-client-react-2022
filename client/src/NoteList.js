@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Stack, Spinner, Heading, Checkbox, Text } from "@chakra-ui/react";
 import {
   UiNote,
@@ -5,7 +6,7 @@ import {
   DeleteButton,
   UiLoadMoreButton,
 } from "./shared-ui";
-import { gql, useMutation, useQuery, useSubscription } from "@apollo/client";
+import { gql, useMutation, useQuery, useSubscription, useApolloClient } from "@apollo/client";
 import { Link } from "react-router-dom";
 import { setNoteSelection } from ".";
 
@@ -48,7 +49,7 @@ const ALL_NODES_QUERY_REST = gql`
 `;
 
 export function NoteList({ category }) {
-  const { data, loading, error, fetchMore } = useQuery(ALL_NODES_QUERY, {
+  const { data, loading, error, fetchMore, subscribeToMore } = useQuery(ALL_NODES_QUERY, {
     variables: {
       categoryId: category,
       offset: 0,
@@ -135,28 +136,65 @@ export function NoteList({ category }) {
       },
     }
   );
+  const client = useApolloClient();
 
-  const { data: newNoteData } = useSubscription(
-    gql`
-      subscription NewSharedNote($categoryId: String) {
-        newSharedNote(categoryId: $categoryId) {
-          id
-          content
-          category {
+  useEffect(() => {
+    const unsubscribe = subscribeToMore({
+      document: gql`
+        subscription NewSharedNote($categoryId: String) {
+          newSharedNote(categoryId: $categoryId) {
             id
-            label
+            content
+            category {
+              id
+              label
+            }
           }
         }
-      }
-    `,
-    {
+      `,
       variables: {
-        categoryId: category,
+        categoryId: category
       },
-    }
-  );
+      updateQuery: (previousQueryResult, { subscriptionData }) => {
+        // merge the existing list with new coming data
+        const newNote = subscriptionData.data.newSharedNote;
+        client.cache.writeQuery({
+          query: ALL_NOTES_QUERY,
+          data: {
+            ...previousQueryResult, // __typename: ....
+            notes: [newNote, ...previousQueryResult.notes]
+          },
+          variables: {
+            categoryId: category
+          },
+          overwrite: true
+        });
+      }
+    });
+    return unsubscribe;
+  }, [category]);
 
-  const newNote = newNoteData?.newSharedNote;
+  // const { data: newNoteData } = useSubscription(
+  //   gql`
+  //     subscription NewSharedNote($categoryId: String) {
+  //       newSharedNote(categoryId: $categoryId) {
+  //         id
+  //         content
+  //         category {
+  //           id
+  //           label
+  //         }
+  //       }
+  //     }
+  //   `,
+  //   {
+  //     variables: {
+  //       categoryId: category,
+  //     },
+  //   }
+  // );
+
+  // const newNote = newNoteData?.newSharedNote;
 
   if (loading && !data) {
     return <Spinner />;
@@ -166,20 +204,20 @@ export function NoteList({ category }) {
     return <Heading>Cannot fetch notes</Heading>;
   }
 
-  const recentChanges = newNote && (
-    <>
-      <Text>Recent changes: </Text>
-      <UiNote
-        category={newNote.category.label}
-        content={newNote.content}
-      ></UiNote>
-    </>
-  );
+  // const recentChanges = newNote && (
+  //   <>
+  //     <Text>Recent changes: </Text>
+  //     <UiNote
+  //       category={newNote.category.label}
+  //       content={newNote.content}
+  //     ></UiNote>
+  //   </>
+  // );
 
   const notes = data?.notes?.filter(Boolean);
   return (
     <Stack spacing={4}>
-      {recentChanges}
+      {/* {recentChanges} */}
       {notes?.map((note) => (
         <UiNote
           key={note.id}
