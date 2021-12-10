@@ -16,6 +16,7 @@ import { RetryLink } from "@apollo/client/link/retry";
 import { RestLink } from "apollo-link-rest";
 import { WebSocketLink } from "@apollo/client/link/ws";
 import { getMainDefinition } from "@apollo/client/utilities";
+import { persistCache, LocalStorageWrapper } from "apollo3-cache-persist";
 
 // makeVar let apollo know the variable value changes
 let selectedNoteIds = makeVar(["2"]);
@@ -56,6 +57,12 @@ const protocolLink = split(
   httpLink
 );
 const client = new ApolloClient({
+  defaultOptions: {
+    watchQuery: {
+      fetchPolicy: "cache-and-network",
+      nextFetchPolicy: "cache-first",
+    },
+  },
   cache: new InMemoryCache({
     typePolicies: {
       Query: {
@@ -86,7 +93,6 @@ const client = new ApolloClient({
       Note: {
         fields: {
           isSelected: {
-            // everytime read it just return true
             read: (crtValue, helpers) => {
               return selectedNoteIds().includes(helpers.readField("id"));
             },
@@ -99,15 +105,21 @@ const client = new ApolloClient({
   link: from([retryLink, restLink, protocolLink]),
 });
 
-ReactDOM.render(
-  <React.StrictMode>
-    <ChakraProvider>
-      <ApolloProvider client={client}>
-        <BrowserRouter>
-          <App />
-        </BrowserRouter>
-      </ApolloProvider>
-    </ChakraProvider>
-  </React.StrictMode>,
-  document.getElementById("root")
-);
+// keep the in-memory cache into localstorage for instant browswer refresh
+persistCache({
+  cache: client.cache,
+  storage: new LocalStorageWrapper(window.localStorage),
+}).then(() => {
+  ReactDOM.render(
+    <React.StrictMode>
+      <ChakraProvider>
+        <ApolloProvider client={client}>
+          <BrowserRouter>
+            <App />
+          </BrowserRouter>
+        </ApolloProvider>
+      </ChakraProvider>
+    </React.StrictMode>,
+    document.getElementById("root")
+  );
+});

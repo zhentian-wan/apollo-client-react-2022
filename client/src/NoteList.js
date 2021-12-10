@@ -6,7 +6,13 @@ import {
   DeleteButton,
   UiLoadMoreButton,
 } from "./shared-ui";
-import { gql, useMutation, useQuery, useSubscription, useApolloClient } from "@apollo/client";
+import {
+  gql,
+  useMutation,
+  useQuery,
+  useSubscription,
+  useApolloClient,
+} from "@apollo/client";
 import { Link } from "react-router-dom";
 import { setNoteSelection } from ".";
 
@@ -49,27 +55,31 @@ const ALL_NODES_QUERY_REST = gql`
 `;
 
 export function NoteList({ category }) {
-  const { data, loading, error, fetchMore, subscribeToMore } = useQuery(ALL_NODES_QUERY, {
-    variables: {
-      categoryId: category,
-      offset: 0,
-      limit: 3,
-    },
-    // setup fetch policy to handle the cache
-    // when to delete cache, when to fetch new data
-    // "cache-and-network" will display cache first
-    // and fetching new data from netowrk to update cache
-    // [Notice] using "cache-and-network" is somehow expensive
-    // for example, after a delete mutation call, even you use `update(cache, mutationResult)`
-    // it will still make an extra fetch call to the backend
-    //
-    fetchPolicy: "cache-first",
-    // by default when there is backend error
-    // apollo will set data to undefined
-    // if we don't want this behavior
-    // we can set errorPolicy to "all"
-    errorPolicy: "all",
-  });
+  const { data, loading, error, fetchMore, subscribeToMore } = useQuery(
+    ALL_NODES_QUERY,
+    {
+      variables: {
+        categoryId: category,
+        offset: 0,
+        limit: 3,
+      },
+      // setup fetch policy to handle the cache
+      // when to delete cache, when to fetch new data
+      // "cache-and-network" will display cache first
+      // and fetching new data from netowrk to update cache
+      // [Notice] using "cache-and-network" is somehow expensive
+      // for example, after a delete mutation call, even you use `update(cache, mutationResult)`
+      // it will still make an extra fetch call to the backend
+      //
+      fetchPolicy: "cache-and-network",
+      nextFetchPolicy: "cache-first",
+      // by default when there is backend error
+      // apollo will set data to undefined
+      // if we don't want this behavior
+      // we can set errorPolicy to "all"
+      errorPolicy: "all",
+    }
+  );
   /**
    * `
       mutation DeleteNote($noteId: String!)
@@ -118,7 +128,7 @@ export function NoteList({ category }) {
       // or we can directly modify cache to avoid make an extra fetch call
       update: (cache, mutationResult) => {
         const deletedNoteId = cache.identify(
-          mutationResult.data.deleteNote.note
+          mutationResult.data?.deleteNote.note
         );
         cache.modify({
           fields: {
@@ -153,23 +163,23 @@ export function NoteList({ category }) {
         }
       `,
       variables: {
-        categoryId: category
+        categoryId: category,
       },
       updateQuery: (previousQueryResult, { subscriptionData }) => {
         // merge the existing list with new coming data
         const newNote = subscriptionData.data.newSharedNote;
         client.cache.writeQuery({
-          query: ALL_NOTES_QUERY,
+          query: ALL_NODES_QUERY,
           data: {
             ...previousQueryResult, // __typename: ....
-            notes: [newNote, ...previousQueryResult.notes]
+            notes: [newNote, ...previousQueryResult.notes],
           },
           variables: {
-            categoryId: category
+            categoryId: category,
           },
-          overwrite: true
+          overwrite: true,
         });
-      }
+      },
     });
     return unsubscribe;
   }, [category]);
@@ -218,9 +228,9 @@ export function NoteList({ category }) {
   return (
     <Stack spacing={4}>
       {/* {recentChanges} */}
-      {notes?.map((note) => (
+      {notes?.map((note, i) => (
         <UiNote
-          key={note.id}
+          key={note.id + "_" + i}
           content={note.content}
           category={note.category.label}
         >
